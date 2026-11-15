@@ -112,11 +112,48 @@ export async function commit(mutate, tables) {
 
 /* ---------- 抓價 ---------- */
 export async function refreshPrices() {
-  if (!store.remote) throw new Error('本機模式無法自動抓價。請到設定連線 Google 試算表，或在標的裡手動填寫價格。');
+  if (!store.remote) return refreshPricesLocal();
   const j = await call('refreshPrices');
   store.S = normalize({ ...store.S, ...j.data });
   lsSet(KEY_DATA, store.S);
   return j.report || [];
+}
+
+/** 本機模式：手機直接抓股票、ETF 價格與美元匯率（基金需手動） */
+async function refreshPricesLocal() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('目前沒有網路，連上網路後再更新價格');
+  const { fetchPrices } = await import('./prices.js');
+  const r = await fetchPrices(store.S.holdings);
+  const anyOk = Object.keys(r.prices).length > 0 || r.fx;
+  const wanted = store.S.holdings.filter(h => h.code && h.kind !== '基金').length;
+  if (!anyOk && wanted) throw new Error('抓不到任何價格，可能是網路或資料來源暫時有問題，請稍後再試');
+  const now = new Date();
+  const report = [];
+  await commit(d => {
+    for (const h of d.holdings) {
+      if (r.prices[h.id]) {
+        const p = r.prices[h.id];
+        h.price = p.price; h.priceDate = p.date; h.priceSrc = 'auto'; h.priceErr = '';
+        report.push({ name: h.name, ok: true, price: p.price, src: p.src });
+      } else if (r.errors[h.id]) {
+        h.priceErr = r.errors[h.id]; if (h.priceSrc !== 'manual') h.priceSrc = 'auto';
+        report.push({ name: h.name, ok: false, error: h.priceErr });
+      }
+    }
+    if (r.fx) d.settings.fxUSD = Math.round(r.fx * 10000) / 10000;
+    d.settings.priceUpdated = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    d.settings.priceUpdatedAt = now.toISOString();
+  }, ['holdings', 'settings']);
+  if (!r.fx) report.push({ name: '美元匯率', ok: false, error: '抓不到匯率' });
+  return Object.assign(report, { skippedFunds: r.skipped.length });
+}
+/** 打開 App 時自動更新（本機模式、有網路、距上次超過 4 小時） */
+export async function autoRefreshPrices() {
+  if (store.remote || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
+  if (!store.S.holdings.some(h => h.code && h.kind !== '基金') && !store.S.holdings.some(h => h.cur === 'USD')) return null;
+  const last = Date.parse(store.S.settings.priceUpdatedAt || '') || 0;
+  if (Date.now() - last < 4 * 3600 * 1000) return null;
+  try { return await refreshPricesLocal(); } catch { return null; }
 }
 
 /* ---------- 連線設定 ---------- */

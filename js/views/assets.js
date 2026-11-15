@@ -68,7 +68,7 @@ export function render(S) {
     h += `<div class="list">${hs.map(x => `<button class="row" data-act="open-hold" data-id="${esc(x.h.id)}">${bubble(x.h.kind === '基金' ? 'fund' : 'investment', 40)}
       <span class="main"><span class="t">${esc(x.h.name)}${priceTag(x.h)}</span><span class="s">${x.h.code ? esc(x.h.code) + '・' : ''}${fmtUnits(x.units)} ${unitWord(x.h)}・${x.h.cur === 'USD' ? 'US$' : ''}${fmtPrice(x.price)}</span></span>
       <span class="v">${m(x.valueTWD)}<small class="${x.unreal >= 0 ? 'pos' : 'neg'}">${x.units > EPS ? pct(x.unrealPct) : '已出清'}</small></span></button>`).join('')}</div>
-      <p class="note" style="margin-top:8px">價格更新於 ${S.settings.priceUpdated ? esc(S.settings.priceUpdated) : '—（尚未更新）'}。股票、ETF 由試算表 GOOGLEFINANCE 抓價，基金淨值抓 MoneyDJ；${S.holdings.some(h => h.cur === 'USD') ? `美元部位以匯率 ${S.settings.fxUSD} 換算台幣。` : ''}</p>`;
+      <p class="note" style="margin-top:8px">價格更新於 ${S.settings.priceUpdated ? esc(S.settings.priceUpdated) : '—（尚未更新）'}。${store.remote ? '股票、ETF 由試算表 GOOGLEFINANCE 抓價，基金淨值抓 MoneyDJ。' : '股票、ETF 自動抓鉅亨網／證交所收盤價（有網路時開 App 會自動更新）；基金淨值請在標的裡手動填寫。'}${S.holdings.some(h => h.cur === 'USD') ? `美元部位以匯率 ${S.settings.fxUSD} 換算台幣。` : ''}</p>`;
   }
   h += '</section>';
   return h;
@@ -176,7 +176,7 @@ export function openHolding(id) {
       <section class="card" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px;margin:0">標的資料</h2>
         <label class="field"><span class="lbl">名稱</span><input class="inp" id="h-name" data-bind="name" value="${esc(st.name)}" maxlength="40"></label>
         <label class="field"><span class="lbl">${h.kind === '基金' ? 'MoneyDJ 基金代碼' : '代號'}</span><input class="inp" id="h-code" data-bind="code" value="${esc(st.code)}" placeholder="${h.kind === '基金' ? '例如 ACDD04' : '例如 0050'}" autocapitalize="characters" maxlength="20"></label>
-        ${!h.code ? '<p class="note">補上代號後，按「更新價格」就會開始自動抓價。</p>' : ''}
+        ${h.kind === '基金' && !store.remote ? '<p class="note">本機模式無法自動抓基金淨值，請用下方「手動填寫淨值」更新。代號可先填好，之後連線試算表就會自動抓。</p>' : !h.code ? '<p class="note">補上代號後，按「更新價格」就會開始自動抓價。</p>' : ''}
         <button class="btn" data-act="save-info">儲存資料</button></section>
       <section class="card" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px;margin:0">手動填寫${h.kind === '基金' ? '淨值' : '價格'}</h2>
         <p class="note">自動抓不到時使用，會標示為「手動」。之後再按「更新價格」成功抓到時，會改回自動價格。</p>
@@ -301,7 +301,8 @@ export const actions = {
     try {
       const report = await busy(el, () => refreshPrices(), '更新中…');
       const bad = report.filter(r => !r.ok);
-      toast(bad.length ? `已更新，${bad.length} 檔抓不到（沿用舊價格，可手動填寫）` : '價格已更新 ✓', !!bad.length);
+      const funds = report.skippedFunds ? `；基金 ${report.skippedFunds} 檔請手動填淨值` : '';
+      toast(bad.length ? `已更新，${bad.length} 項抓不到（沿用舊價格，可手動填寫）${funds}` : `價格已更新 ✓${funds}`, !!bad.length);
       rerender();
     } catch (e) { toast(e.message, true); }
   },

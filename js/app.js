@@ -1,6 +1,6 @@
 // 主程式：換頁、底部導覽、事件分派、主題、PWA
 import { icon } from './icons.js';
-import { store, init } from './store.js';
+import { store, init, autoRefreshPrices } from './store.js';
 import { V, setRenderer, setTxOpener, rerender, openTx } from './bus.js';
 import { $, toast, sheetTop, closeSheet, closeAllSheets, refreshSheet } from './ui.js';
 import { openTxForm } from './forms.js';
@@ -115,6 +115,9 @@ async function start() {
   V.route = VIEWS[(location.hash || '#home').slice(1)] ? location.hash.slice(1) : 'home';
   if (location.hash === '#add') { V.route = 'home'; history.replaceState(null, '', '#home'); render(); openTx(); }
   else render();
+  // 本機模式：有網路就自動更新股價與匯率（每 4 小時最多一次）
+  autoRefreshPrices().then(r => { if (r && !sheetTop()) render(); });
+  window.addEventListener('online', () => autoRefreshPrices().then(r => { if (r && !sheetTop()) render(); }));
   // 重新回到前景時，若已連線則靜默更新
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible' || !store.remote || sheetTop()) return;
