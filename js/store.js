@@ -202,7 +202,9 @@ export function parseImport(text) {
   let s = String(text || '')
     .replace(/[“”„‟″]/g, '"').replace(/[‘’]/g, "'")
     .replace(/[   ​﻿]/g, ' ');
-  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  // 從第一個「{"」開始（略過說明文字裡可能出現的括號）
+  let a = s.search(/\{\s*"/); if (a < 0) a = s.indexOf('{');
+  const b = s.lastIndexOf('}');
   if (a < 0 || b <= a) throw new Error('找不到資料，請確認整段文字都有複製到（開頭是「{」、結尾是「}」）');
   let raw;
   try { raw = JSON.parse(s.slice(a, b + 1)); }
