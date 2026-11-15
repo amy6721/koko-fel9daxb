@@ -1,0 +1,3 @@
+/* Proposed implementation tokens */
+:root { --bg:#FFF8F4; --surface:#FFFFFF; --primary:#D98085; --primary-soft:#FBE4E1; --text:#3E3431; --muted:#806E67; --border:#EEDDD7; --income:#28704B; --expense:#B83B48; --radius:18px; --touch:44px; }
+[data-theme="dark"] { --bg:#241F20; --surface:#332B2C; --primary:#F0A0A4; --primary-soft:#503638; --text:#F9ECE7; --muted:#CBB5AF; --border:#594747; --income:#9CD5AF; --expense:#FF9CA6; }
