@@ -32,6 +32,7 @@ export function render(S) {
     <div class="two"><label class="field"><span class="lbl">美元匯率（1 USD＝幾台幣）</span><input class="inp num" inputmode="decimal" data-act-change="fx" data-cur="USD" value="${esc(S.settings.fxUSD)}"></label>
       <label class="field"><span class="lbl">日圓匯率（1 JPY＝幾台幣）</span><input class="inp num" inputmode="decimal" data-act-change="fx" data-cur="JPY" value="${esc(S.settings.fxJPY)}"></label></div>
     <p class="note" style="margin-top:-8px">有網路時會自動更新匯率。</p>
+    <label class="toggle"><input type="checkbox" data-act="remind-toggle" ${store.pref.remind !== false ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--primary)"><span>打開 App 時，提醒需要手動更新的價格（例如基金淨值）</span></label>
   </section>`;
 
   h += `<section class="card"><div class="sec-head"><h2>帳戶</h2><button class="btn sm soft" data-act="new-acct">${icon('add', 16)}新增帳戶</button></div>`;
@@ -63,7 +64,7 @@ export function render(S) {
     <p class="note"><b>iPhone</b>：用 Safari 打開網址 → 分享 → 加入主畫面。</p>
     <p class="note"><b>Android</b>：用 Chrome 打開網址 → 右上選單 → 加到主畫面（或「安裝應用程式」）。</p>
     <p class="note">從主畫面打開時會全螢幕顯示，沒有網址列。</p></section>
-  <p class="note" style="text-align:center">摳摳 v1.3</p>`;
+  <p class="note" style="text-align:center">摳摳 v1.4</p>`;
   return h;
 }
 
@@ -102,6 +103,7 @@ export const actions = {
     try { await commit(d => { d.settings[k] = v; }, ['settings']); toast('已更新匯率'); rerender(); }
     catch (e) { toast('儲存失敗：' + e.message, true); }
   },
+  'remind-toggle': el => { setPref({ remind: el.checked }); toast(el.checked ? '已開啟提醒' : '已關閉提醒'); },
   'edit-acct': el => openAccountForm(el.dataset.id),
   connect: async el => {
     const conn = { url: draft.url.trim(), key: draft.key.trim() };

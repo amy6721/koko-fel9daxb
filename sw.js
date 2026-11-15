@@ -1,9 +1,9 @@
 // 離線快取：App 本體先用網路（確保拿到最新版），失敗才用快取。
 // 試算表資料（script.google.com）一律不快取。
-const VERSION = 'koko-v1.3.1';
+const VERSION = 'koko-v1.4.0';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/tokens.css', 'css/app.css',
-  'js/app.js', 'js/bus.js', 'js/calc.js', 'js/demo.js', 'js/forms.js', 'js/icons.js', 'js/prices.js', 'js/appicon.js', 'js/store.js', 'js/ui.js', 'js/util.js',
+  'js/app.js', 'js/bus.js', 'js/calc.js', 'js/demo.js', 'js/forms.js', 'js/icons.js', 'js/prices.js', 'js/remind.js', 'js/appicon.js', 'js/store.js', 'js/ui.js', 'js/util.js',
   'js/views/home.js', 'js/views/ledger.js', 'js/views/assets.js', 'js/views/stats.js', 'js/views/settings.js',
   'assets/brand/logo.png', 'assets/brand/mascot-peek.png', 'assets/brand/paw.png',
   'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/apple-touch-icon.png',

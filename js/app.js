@@ -5,6 +5,7 @@ import { V, setRenderer, setTxOpener, rerender, openTx } from './bus.js';
 import { $, toast, sheetTop, closeSheet, closeAllSheets, refreshSheet } from './ui.js';
 import { openTxForm } from './forms.js';
 import { applyTouchIcon } from './appicon.js';
+import { maybeRemindOnOpen, openManualReminder } from './remind.js';
 import * as home from './views/home.js';
 import * as ledger from './views/ledger.js';
 import * as assets from './views/assets.js';
@@ -65,6 +66,7 @@ const GLOBAL = {
   'edit-tx': el => openTx({ id: el.dataset.id }),
   'open-acct': el => assets.openAccount(el.dataset.id),
   'open-hold': el => assets.openHolding(el.dataset.id),
+  'open-manual': () => openManualReminder(),
   'go-accounts': (el, e) => { e.preventDefault(); location.hash = '#settings'; setTimeout(() => assets.openAccountForm(), 50); },
 };
 function handlerFor(name) {
@@ -116,7 +118,13 @@ async function start() {
   if (location.hash === '#add') { V.route = 'home'; history.replaceState(null, '', '#home'); render(); openTx(); }
   else render();
   // 本機模式：有網路就自動更新股價與匯率（每 4 小時最多一次）
-  autoRefreshPrices().then(r => { if (r && !sheetTop()) render(); });
+  autoRefreshPrices().then(r => { if (r && !sheetTop()) render(); maybeRemindOnOpen(); });
+  // 從背景切回來超過 10 分鐘，視為重新打開
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 10 * 60 * 1000) autoRefreshPrices().then(r => { if (r && !sheetTop()) render(); maybeRemindOnOpen(); });
+  });
   window.addEventListener('online', () => autoRefreshPrices().then(r => { if (r && !sheetTop()) render(); }));
   // 重新回到前景時，若已連線則靜默更新
   document.addEventListener('visibilitychange', async () => {

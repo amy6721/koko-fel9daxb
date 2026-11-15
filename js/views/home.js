@@ -4,6 +4,7 @@ import { esc, money, signed, pct, monthOf, todayStr, shiftMonth, shortDate, full
 import { totals, replay, monthSummary, netWorthSeries, sortTxs, isCard, cardInfo, priceStatus } from '../calc.js';
 import { store, setPref } from '../store.js';
 import { V, rerender } from '../bus.js';
+import { manualItems } from '../remind.js';
 import { m, txRow, monthBar, trendSVG, trendXY, TW, TH, emptyState, openSheet, sheetHead, $, bubble } from '../ui.js';
 
 export function reminders(S) {
@@ -20,10 +21,8 @@ export function reminders(S) {
       if (overdue || (days !== null && days <= 7)) out.push({ icon: 'credit-card', hue: 0, title: `${a.name} 帳單${overdue ? '已逾期' : `還有 ${days} 天到期`}`, sub: `應繳 ${money(left)}・截止 ${b.due ? fullDate(b.due) : '—'}`, bad: overdue, acct: a.id });
     }
   }
-  const bad = S.holdings.filter(h => priceStatus(h) === 'error');
-  if (bad.length) out.push({ icon: 'refresh', hue: 40, title: `${bad.length} 檔標的抓價失敗`, sub: bad.map(h => h.name).join('、') + '・可到資產頁手動填寫' });
-  const pending = S.holdings.filter(h => priceStatus(h) === 'pending');
-  if (pending.length) out.push({ icon: 'investment', hue: 40, title: `${pending.length} 檔標的待補代碼`, sub: pending.map(h => h.name).join('、') });
+  const man = manualItems(S);
+  if (man.length) out.push({ icon: 'refresh', hue: 40, title: `${man.length} 檔需要手動更新價格`, sub: man.map(x => x.h.name).join('、'), act: 'open-manual' });
   return out;
 }
 
@@ -132,9 +131,9 @@ export const actions = {
     openSheet({
       label: '提醒',
       render: () => `<div class="grabber"></div>${sheetHead('提醒')}
-        ${list.length ? `<div class="card"><div class="list">${list.map(r => `<${r.acct ? `button data-act="open-acct" data-id="${esc(r.acct)}"` : 'div'} class="row">${bubble(r.icon, r.hue)}<span class="main"><span class="t ${r.bad ? 'neg' : ''}">${esc(r.title)}</span><span class="s">${esc(r.sub)}</span></span></${r.acct ? 'button' : 'div'}>`).join('')}</div></div>`
+        ${list.length ? `<div class="card"><div class="list">${list.map(r => `<${r.acct ? `button data-act="open-acct" data-id="${esc(r.acct)}"` : r.act ? `button data-act="${r.act}"` : 'div'} class="row">${bubble(r.icon, r.hue)}<span class="main"><span class="t ${r.bad ? 'neg' : ''}">${esc(r.title)}</span><span class="s">${esc(r.sub)}</span></span></${r.acct || r.act ? 'button' : 'div'}>`).join('')}</div></div>`
           : `<div class="card">${emptyState('目前沒有需要注意的事項', 'bell')}</div>`}
-        <p class="note">提醒包含：7 天內到期或逾期的信用卡帳單、抓價失敗或待補代碼的標的。</p>`,
+        <p class="note">提醒包含：7 天內到期或逾期的信用卡帳單，以及需要手動更新價格的標的（基金淨值、抓價失敗、待補代碼）。</p>`,
     });
   },
 };
