@@ -186,5 +186,64 @@ export function setPref(p) { Object.assign(store.pref, p); lsSet(KEY_PREF, store
 export async function replaceAll(data) {
   const S = normalize(data);
   await commit(d => { for (const t of TABLES) d[t] = S[t]; d.settings = S.settings; }, [...TABLES, 'settings']);
+  await ensureSnapshot();
 }
 export function exportJSON() { return JSON.stringify(store.S, null, 2); }
+
+/* ---------- 貼上匯入 ---------- */
+const TYPES = ['bank', 'cash', 'fx', 'broker', 'fund', 'insure', 'deposit', 'debt'];
+const KINDS = ['expense', 'income', 'transfer', 'buy', 'sell', 'div'];
+/**
+ * 解析貼上的文字（備份 JSON）。容忍備忘錄造成的彎引號、不換行空白，
+ * 以及開頭結尾多複製到的文字。回傳正規化後的資料與問題清單。
+ */
+export function parseImport(text) {
+  let s = String(text || '')
+    .replace(/[“”„‟″]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/[   ​﻿]/g, ' ');
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) throw new Error('找不到資料，請確認整段文字都有複製到（開頭是「{」、結尾是「}」）');
+  let raw;
+  try { raw = JSON.parse(s.slice(a, b + 1)); }
+  catch { throw new Error('資料格式不完整，可能沒有複製到全部文字，請重新複製整段再貼上'); }
+  if (!raw || typeof raw !== 'object') throw new Error('資料格式不正確');
+  const d = normalize(raw);
+  const problems = [];
+  const ids = new Set(d.accounts.map(x => x.id));
+  d.accounts.forEach((x, i) => {
+    if (!x.id || !x.name) problems.push(`第 ${i + 1} 個帳戶缺少 id 或名稱`);
+    if (!TYPES.includes(x.type)) problems.push(`帳戶「${x.name}」類型不正確（${x.type}）`);
+    if (!['TWD', 'USD'].includes(x.cur)) problems.push(`帳戶「${x.name}」幣別不正確（${x.cur}）`);
+  });
+  const hids = new Set(d.holdings.map(h => h.id));
+  d.holdings.forEach(h => { if (!ids.has(h.acct) && !store.S.accounts.some(a => a.id === h.acct)) problems.push(`標的「${h.name}」的帳戶不存在`); });
+  const acctOk = id => ids.has(id) || store.S.accounts.some(a => a.id === id);
+  d.txs.forEach((t, i) => {
+    const n = `第 ${i + 1} 筆紀錄（${t.date || '無日期'} ${t.note || ''}）`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) problems.push(`${n}日期格式不正確`);
+    if (!KINDS.includes(t.kind)) problems.push(`${n}種類不正確（${t.kind}）`);
+    if (!(t.amt > 0)) problems.push(`${n}金額必須大於 0`);
+    if (!acctOk(t.acct)) problems.push(`${n}帳戶不存在`);
+    if (t.kind === 'transfer' && !acctOk(t.to)) problems.push(`${n}轉入帳戶不存在`);
+    if (['buy', 'sell', 'div'].includes(t.kind) && !hids.has(t.hid) && !store.S.holdings.some(h => h.id === t.hid)) problems.push(`${n}標的不存在`);
+    if (!t.id) t.id = 'imp' + i + Math.random().toString(36).slice(2, 7);
+    if (!t.created) t.created = `${t.date}T00:00:${String(i % 60).padStart(2, '0')}`;
+  });
+  return { data: d, problems, hasSettings: !!(raw.settings && Object.keys(raw.settings).length) };
+}
+/** 把匯入資料「加入」現有資料（相同 id 的略過），回傳各類新增數量 */
+export async function mergeImport(data) {
+  const added = {};
+  await commit(d => {
+    for (const t of TABLES) {
+      const key = t === 'snapshots' ? 'month' : 'id';
+      const have = new Set(d[t].map(x => x[key]));
+      const fresh = data[t].filter(x => !have.has(x[key]));
+      d[t].push(...fresh);
+      added[t] = fresh.length;
+    }
+    if (data.settings.startDate && (!d.txs.length || data.settings.startDate < d.settings.startDate)) d.settings.startDate = data.settings.startDate;
+  }, [...TABLES, 'settings']);
+  await ensureSnapshot();
+  return added;
+}

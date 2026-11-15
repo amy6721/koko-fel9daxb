@@ -2,9 +2,9 @@
 import { icon } from '../icons.js';
 import { esc, money, num, todayStr } from '../util.js';
 import { ACCOUNT_TYPES, TYPE_ORDER, accountValueTWD, replay, isCard } from '../calc.js';
-import { store, commit, connect, disconnect, testConnection, remoteHasData, reload, setPref, replaceAll, exportJSON, emptyState as emptyData } from '../store.js';
+import { store, commit, connect, disconnect, testConnection, remoteHasData, reload, setPref, replaceAll, exportJSON, emptyState as emptyData, parseImport, mergeImport } from '../store.js';
 import { rerender } from '../bus.js';
-import { m, bubble, acctIcon, toast, busy, confirmSheet, openSheet, closeSheet, sheetHead } from '../ui.js';
+import { m, bubble, acctIcon, toast, busy, confirmSheet, openSheet, closeSheet, refreshSheet, sheetHead } from '../ui.js';
 import { openAccountForm } from './assets.js';
 import { ICON_STYLES, appIconSVG, applyTouchIcon } from '../appicon.js';
 import { demoData } from '../demo.js';
@@ -52,6 +52,7 @@ export function render(S) {
 
   h += `<section class="card" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px;margin:0">備份與資料</h2>
     <div class="two"><button class="btn" data-act="export">匯出備份</button><label class="btn" style="cursor:pointer">匯入備份<input type="file" accept="application/json,.json" data-act-change="import" hidden></label></div>
+    <button class="btn soft" data-act="paste-import">${icon('note', 18)}貼上文字匯入</button>
     <button class="btn" data-act="load-demo">載入示範資料</button>
     <button class="btn danger" data-act="clear">清除所有資料</button>
     <p class="note">匯入、示範資料、清除都會取代目前所有資料${store.remote ? '（包含試算表裡的資料）' : ''}，執行前會再確認一次。</p></section>`;
@@ -60,7 +61,7 @@ export function render(S) {
     <p class="note"><b>iPhone</b>：用 Safari 打開網址 → 分享 → 加入主畫面。</p>
     <p class="note"><b>Android</b>：用 Chrome 打開網址 → 右上選單 → 加到主畫面（或「安裝應用程式」）。</p>
     <p class="note">從主畫面打開時會全螢幕顯示，沒有網址列。</p></section>
-  <p class="note" style="text-align:center">摳摳 v1.1</p>`;
+  <p class="note" style="text-align:center">摳摳 v1.2</p>`;
   return h;
 }
 
@@ -144,6 +145,7 @@ export const actions = {
     if (!await guardReplace('匯入備份？')) return;
     try { await replaceAll(data); toast('已匯入備份'); rerender(); } catch (e) { toast('匯入失敗：' + e.message, true); }
   },
+  'paste-import': () => openPasteImport(),
   'load-demo': async () => {
     if ((store.S.accounts.length || store.S.txs.length) && !await guardReplace('載入示範資料？')) return;
     try { await replaceAll(demoData()); toast('已載入示範資料，可到設定「清除所有資料」後開始正式使用'); location.hash = '#home'; rerender(); }
@@ -155,3 +157,79 @@ export const actions = {
   },
 };
 export function onInput(e) { const k = e.target.dataset.bind; if (k && k in draft) draft[k] = e.target.value; }
+
+/* ---------- 貼上文字匯入 ---------- */
+function openPasteImport() {
+  const st = { text: '', parsed: null, err: '' };
+  const isEmpty = () => !store.S.accounts.length && !store.S.txs.length;
+  const s = openSheet({
+    full: true, label: '貼上文字匯入',
+    render: () => {
+      let h = sheetHead('貼上文字匯入');
+      if (!st.parsed) {
+        h += `<p class="note">把整理好的資料文字整段複製，長按下面的框框選「貼上」，再按「讀取資料」。</p>
+          <textarea class="inp" id="imp-text" data-bind="text" rows="10" style="min-height:220px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.4" placeholder="在這裡長按 → 貼上" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">${esc(st.text)}</textarea>
+          <div class="err" role="alert">${esc(st.err)}</div>
+          <button class="btn pri full" data-act="read">讀取資料</button>
+          <p class="note">貼上的文字只會存在這支手機裡，不會上傳到任何地方。</p>`;
+        return h;
+      }
+      const { data, problems } = st.parsed;
+      const inv = data.txs.filter(t => ['buy', 'sell', 'div'].includes(t.kind)).length;
+      const dates = data.txs.map(t => t.date).sort();
+      h += `<section class="card"><h2 style="font-size:16px;margin:0 0 10px">讀到的資料</h2><dl class="kv">
+          <dt>帳戶</dt><dd>${data.accounts.length} 個</dd>
+          <dt>記帳紀錄</dt><dd>${data.txs.length - inv} 筆</dd>
+          <dt>投資紀錄</dt><dd>${inv} 筆</dd>
+          <dt>投資標的</dt><dd>${data.holdings.length} 檔</dd>
+          ${dates.length ? `<dt>日期範圍</dt><dd>${esc(dates[0])} ～ ${esc(dates[dates.length - 1])}</dd>` : ''}
+          ${data.settings.startDate ? `<dt>開始使用日</dt><dd>${esc(data.settings.startDate)}</dd>` : ''}
+        </dl>
+        ${data.accounts.length ? `<div class="lbl" style="margin-top:12px">帳戶</div><p style="margin:4px 0 0;font-size:14px">${data.accounts.map(a => esc(a.name)).join('、')}</p>` : ''}</section>`;
+      if (problems.length) {
+        h += `<div class="banner" style="flex-direction:column;align-items:flex-start;background:color-mix(in srgb,var(--expense) 12%,transparent)"><b>有 ${problems.length} 個問題，請修正後再匯入：</b>
+          <ul style="margin:4px 0 0;padding-left:1.2em">${problems.slice(0, 8).map(p => `<li>${esc(p)}</li>`).join('')}${problems.length > 8 ? `<li>…還有 ${problems.length - 8} 個</li>` : ''}</ul></div>
+          <button class="btn full" data-act="back">重新貼上</button>`;
+        return h;
+      }
+      if (isEmpty()) h += `<button class="btn pri full" data-act="replace">匯入</button>`;
+      else h += `<p class="note">手機裡已經有資料，請選擇匯入方式：</p>
+        <button class="btn pri full" data-act="merge">加入到現有資料</button>
+        <p class="note" style="text-align:center;margin-top:-6px">保留現有資料，只加入新的（重複的會略過）</p>
+        <button class="btn full danger" data-act="replace">取代全部資料</button>
+        <p class="note" style="text-align:center;margin-top:-6px">刪除手機上現有的資料，只留匯入的資料</p>`;
+      h += `<button class="btn full" data-act="back">重新貼上</button>`;
+      return h;
+    },
+    onInput: e => { if (e.target.dataset.bind === 'text') { st.text = e.target.value; st.err = ''; } },
+    on: {
+      read: () => {
+        if (!st.text.trim()) { st.err = '請先貼上資料文字'; return refreshSheet(s); }
+        try { st.parsed = parseImport(st.text); st.err = ''; }
+        catch (e) { st.err = e.message; }
+        refreshSheet(s);
+      },
+      back: () => { st.parsed = null; refreshSheet(s); },
+      merge: async el => {
+        try {
+          const n = await busy(el, () => mergeImport(st.parsed.data), '匯入中…');
+          closeSheet(s); toast(`已加入 ${n.accounts} 個帳戶、${n.txs} 筆紀錄、${n.holdings} 檔標的`); location.hash = '#home'; rerender();
+        } catch (e) { toast('匯入失敗：' + e.message, true); }
+      },
+      replace: async el => {
+        if (!isEmpty() && !await guardReplace('取代全部資料？')) return;
+        const data = st.parsed.data;
+        if (!data.settings.startDate) data.settings.startDate = store.S.settings.startDate;
+        try {
+          await busy(el, () => replaceAll({ ...data, settings: { ...store.S.settings, ...pickSettings(data.settings) } }), '匯入中…');
+          closeSheet(s); toast('匯入完成 ✓'); location.hash = '#home'; rerender();
+        } catch (e) { toast('匯入失敗：' + e.message, true); }
+      },
+    },
+  });
+}
+function pickSettings(o) {
+  const out = {};
+  for (const k of ['startDate', 'defaultAcct', 'fxUSD', 'appName', 'iconStyle']) if (o[k] !== undefined && o[k] !== '') out[k] = o[k];
+  return out;
+}
