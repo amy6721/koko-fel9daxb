@@ -64,7 +64,7 @@ export function render(S) {
     <p class="note"><b>iPhone</b>：用 Safari 打開網址 → 分享 → 加入主畫面。</p>
     <p class="note"><b>Android</b>：用 Chrome 打開網址 → 右上選單 → 加到主畫面（或「安裝應用程式」）。</p>
     <p class="note">從主畫面打開時會全螢幕顯示，沒有網址列。</p></section>
-  <p class="note" style="text-align:center">摳摳 v1.4</p>`;
+  <p class="note" style="text-align:center">摳摳 v1.5</p>`;
   return h;
 }
 

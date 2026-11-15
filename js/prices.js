@@ -68,6 +68,12 @@ async function fromFinMind(code) {
 
 /** 回傳 { USD: 1 美元幾台幣, JPY: 1 日圓幾台幣 } */
 export async function fetchFx() {
+  // 優先用鉅亨網即時匯率（與匯率走勢一致），失敗再用 ExchangeRate-API
+  try {
+    const { fetchLatest } = await import('./fx.js');
+    const q = await fetchLatest(['USD', 'JPY']);
+    if (q.USD && q.JPY) return { USD: q.USD.rate, JPY: q.JPY.rate };
+  } catch { }
   const j = await getJSON('https://open.er-api.com/v6/latest/USD');
   const twd = Number(j && j.rates && j.rates.TWD), jpy = Number(j && j.rates && j.rates.JPY);
   if (!(twd > 0) || !(jpy > 0)) throw new Error('匯率資料格式不符');

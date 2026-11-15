@@ -352,3 +352,21 @@ select.inp { appearance: none; -webkit-appearance: none; background-image: linea
 .skel { background: linear-gradient(90deg, var(--sunk), var(--surface), var(--sunk)); background-size: 200% 100%; animation: sk 1.2s infinite; border-radius: 12px; }
 @keyframes sk { to { background-position: -200% 0; } }
 .masked { letter-spacing: .1em; }
+
+/* ---------- 匯率走勢 ---------- */
+.fx-block { padding: 12px 0 4px; }
+.fx-block + .fx-block { border-top: 1px solid var(--border); margin-top: 8px; }
+.fx-head { display: flex; align-items: baseline; gap: 8px; }
+.fx-head b { flex: 1; font-size: 15px; }
+.fx-rate { font-size: 22px; font-weight: 800; }
+.fx-sub { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+.fxchart { margin: 8px -2px 0; touch-action: pan-y; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.fxchart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.fxchart .grid { stroke: var(--border); stroke-width: 1; }
+.fxchart text { fill: var(--muted); font-size: 10.5px; font-family: var(--f-num); }
+.fx-area { fill: var(--primary); opacity: .13; }
+.fx-line { fill: none; stroke: var(--primary); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.fx-guide { stroke: var(--primary); stroke-dasharray: 3 3; opacity: .7; }
+.fx-dot { fill: var(--primary); stroke: var(--surface); stroke-width: 2.5; }
+.fx-read { font-size: 13px; color: var(--muted); min-height: 1.5em; margin-top: 4px; }
+.fx-read b { color: var(--text); }

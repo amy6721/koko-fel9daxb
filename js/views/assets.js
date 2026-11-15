@@ -6,6 +6,7 @@ import {
   holdingSummary, visibleInOverview, cardInfo, priceStatus, unitWord, fxRate, sortTxs, isBackfill, KIND_LABEL,
 } from '../calc.js';
 import { store, commit, refreshPrices } from '../store.js';
+import { ensureFx, fxCardHTML, fmtRate } from '../fx.js';
 import { V, rerender, openTx } from '../bus.js';
 import { m, ms, txRow, bubble, acctIcon, emptyState, openSheet, refreshSheet, closeSheet, sheetHead, toast, busy, confirmSheet, donut, legend, PALETTE } from '../ui.js';
 
@@ -23,7 +24,7 @@ function acctSub(S, a, R) {
   }
   const hs = S.holdings.filter(h => h.acct === a.id && ((R.pos[h.id]?.units || 0) > EPS));
   if (hs.length) return `現金 ${money(cashBalance(S, a.id), a.cur)} ＋ 持有 ${hs.length} 檔`;
-  if (a.cur !== 'TWD') return money(cashBalance(S, a.id), a.cur);
+  if (a.cur !== 'TWD') return `${money(cashBalance(S, a.id), a.cur)}・匯率 ${fmtRate(a.cur, fxRate(S, a.cur))}`;
   return ACCOUNT_TYPES[a.type].label + (a.archived ? '・已封存' : '');
 }
 
@@ -54,6 +55,9 @@ export function render(S) {
   const hidden = S.accounts.filter(a => !visibleInOverview(S, a, R));
   if (hidden.length) h += `<p class="note" style="margin-top:8px">另有 ${hidden.length} 個已封存且餘額為 0 的帳戶，可在「設定 → 帳戶」查看。</p>`;
   h += '</section>';
+  const curs = heldCurrencies(S);
+  if (curs.length) h += `<section class="card"><div class="sec-head"><h2>匯率走勢</h2><span class="lbl">近 3 個月</span></div>${curs.map(c => fxCardHTML(c, fxRate(S, c))).join('')}
+    <p class="note" style="margin-top:8px">資料來源：鉅亨網。點或滑動圖表可查看每天的匯率；有網路時每 6 小時更新一次。</p></section>`;
 
   // 投資組合
   const hs = holdingSummary(S, R).filter(x => x.units > EPS || x.trades.length);
@@ -91,6 +95,7 @@ export function openAccount(id) {
         <div class="nw-big" style="font-size:26px">${isCard(a) ? m(-bal) : m(v)}</div>
         ${isCard(a) ? '<div class="lbl">目前欠款</div>' : a.cur !== 'TWD' ? `<div class="lbl">原幣 ${m(bal, a.cur)}</div>` : S.holdings.some(h => h.acct === a.id) ? `<div class="lbl">現金 ${m(bal)}・含持有標的市值</div>` : ''}</div></section>`;
       if (!a.archived) h += `<button class="btn soft full" data-act="add-here">${icon('add', 18)}在這個帳戶記一筆</button>`;
+      if (a.cur !== 'TWD') { h += `<section class="card"><div class="sec-head"><h2>匯率走勢</h2><span class="lbl">近 3 個月</span></div>${fxCardHTML(a.cur, fxRate(S, a.cur))}</section>`; if (!st.fxAsked) { st.fxAsked = true; ensureFx([a.cur]).then(ch => { if (ch && s && s.el.isConnected) refreshSheet(s); }).catch(() => { }); } }
       if (isCard(a)) h += cardSection(S, a);
       const hs = S.holdings.filter(x => x.acct === a.id);
       if (hs.length) {
@@ -291,6 +296,18 @@ export function openAccountForm(id = null) {
       },
     },
   });
+}
+
+/** 目前持有的外幣（帳戶或標的） */
+export function heldCurrencies(S) {
+  const set = new Set();
+  for (const a of S.accounts) if (a.cur !== 'TWD' && (!a.archived || Math.abs(cashBalance(S, a.id)) > 0.004)) set.add(a.cur);
+  for (const h of S.holdings) if (h.cur !== 'TWD') set.add(h.cur);
+  return ['USD', 'JPY'].filter(c => set.has(c));
+}
+export function after(S) {
+  const curs = heldCurrencies(S);
+  if (curs.length) ensureFx(curs).then(ch => { if (ch) rerender(); }).catch(() => { });
 }
 
 export const actions = {
