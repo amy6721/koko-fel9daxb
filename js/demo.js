@@ -66,7 +66,7 @@ export function demoData(today = todayStr()) {
   // 本月：提前繳一點卡費（展示「未出帳・已預繳」）
   add({ date: d(cur, 2) <= today ? d(cur, 2) : today, kind: 'expense', cat: '餐飲', amt: 85, acct: 'a2', note: '早餐 蛋餅豆漿' });
 
-  const settings = { appName: '摳摳', iconStyle: 0, startDate, defaultAcct: 'a2', fxUSD: 30.6, priceUpdated: `${today.slice(5).replace('-', '/')} 08:00`, priceUpdatedAt: new Date().toISOString() };
+  const settings = { appName: '摳摳', iconStyle: 0, startDate, defaultAcct: 'a2', fxUSD: 30.6, fxJPY: 0.205, priceUpdated: `${today.slice(5).replace('-', '/')} 08:00`, priceUpdatedAt: new Date().toISOString() };
   const S = { settings, accounts, holdings, txs, snapshots: [] };
 
   // 信用卡：每期帳單在繳款日前 3 天從薪轉帳戶繳清

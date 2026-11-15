@@ -9,12 +9,12 @@ export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-/** 金額：TWD → $1,234（無小數）；USD → US$1,234.56；負數用「−」 */
+/** 金額：TWD → $1,234（無小數）；USD → US$1,234.56；JPY → ¥1,234；負數用「−」 */
 export function money(n, cur = 'TWD') {
   n = Number(n) || 0;
   const a = Math.abs(n);
   const neg = cur === 'USD' ? a >= 0.005 && n < 0 : Math.round(a) > 0 && n < 0;
-  const s = cur === 'USD' ? 'US$' + nf2.format(a) : '$' + nf0.format(Math.round(a));
+  const s = cur === 'USD' ? 'US$' + nf2.format(a) : (cur === 'JPY' ? '¥' : '$') + nf0.format(Math.round(a));
   return (neg ? '−' : '') + s;
 }
 /** 帶正負號（+ / −） */

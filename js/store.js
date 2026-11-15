@@ -11,7 +11,7 @@ export const TABLES = ['accounts', 'txs', 'holdings', 'snapshots'];
 
 export function emptyState() {
   return {
-    settings: { appName: '摳摳', iconStyle: 0, startDate: todayStr(), defaultAcct: '', fxUSD: 30.5, priceUpdated: '' },
+    settings: { appName: '摳摳', iconStyle: 0, startDate: todayStr(), defaultAcct: '', fxUSD: 30.5, fxJPY: 0.2, priceUpdated: '' },
     accounts: [], txs: [], holdings: [], snapshots: [],
   };
 }
@@ -37,8 +37,9 @@ function normalize(d) {
   S.accounts = S.accounts.map(a => ({ ...a, open: Number(a.open) || 0, billDay: n(a.billDay) || '', dueDay: n(a.dueDay) || '', archived: a.archived === true || a.archived === 'TRUE' || a.archived === 'true' }));
   S.txs = S.txs.map(t => ({ ...t, date: String(t.date).slice(0, 10), amt: Number(t.amt) || 0, amt2: n(t.amt2), units: n(t.units), price: n(t.price), fee: n(t.fee) }));
   S.holdings = S.holdings.map(h => ({ ...h, price: n(h.price), priceErr: h.priceErr || '' }));
-  S.snapshots = S.snapshots.map(s => ({ ...s, month: String(s.month).slice(0, 7), date: String(s.date || s.month + '-01').slice(0, 10), fxUSD: Number(s.fxUSD) || 0, prices: typeof s.prices === 'string' ? safeJSON(s.prices) : (s.prices || {}) }));
+  S.snapshots = S.snapshots.map(s => ({ ...s, month: String(s.month).slice(0, 7), date: String(s.date || s.month + '-01').slice(0, 10), fxUSD: Number(s.fxUSD) || 0, fxJPY: Number(s.fxJPY) || 0, prices: typeof s.prices === 'string' ? safeJSON(s.prices) : (s.prices || {}) }));
   S.settings.fxUSD = Number(S.settings.fxUSD) || 30.5;
+  S.settings.fxJPY = Number(S.settings.fxJPY) || 0.2;
   S.settings.iconStyle = Number(S.settings.iconStyle) || 0;
   return S;
 }
@@ -140,17 +141,17 @@ async function refreshPricesLocal() {
         report.push({ name: h.name, ok: false, error: h.priceErr });
       }
     }
-    if (r.fx) d.settings.fxUSD = Math.round(r.fx * 10000) / 10000;
+    if (r.fx) { d.settings.fxUSD = Math.round(r.fx.USD * 10000) / 10000; d.settings.fxJPY = Math.round(r.fx.JPY * 100000) / 100000; }
     d.settings.priceUpdated = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     d.settings.priceUpdatedAt = now.toISOString();
   }, ['holdings', 'settings']);
-  if (!r.fx) report.push({ name: '美元匯率', ok: false, error: '抓不到匯率' });
+  if (!r.fx) report.push({ name: '匯率', ok: false, error: '抓不到匯率' });
   return Object.assign(report, { skippedFunds: r.skipped.length });
 }
 /** 打開 App 時自動更新（本機模式、有網路、距上次超過 4 小時） */
 export async function autoRefreshPrices() {
   if (store.remote || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
-  if (!store.S.holdings.some(h => h.code && h.kind !== '基金') && !store.S.holdings.some(h => h.cur === 'USD')) return null;
+  if (!store.S.holdings.some(h => h.code && h.kind !== '基金') && !store.S.accounts.some(a => a.cur !== 'TWD') && !store.S.holdings.some(h => h.cur !== 'TWD')) return null;
   const last = Date.parse(store.S.settings.priceUpdatedAt || '') || 0;
   if (Date.now() - last < 4 * 3600 * 1000) return null;
   try { return await refreshPricesLocal(); } catch { return null; }
@@ -213,7 +214,7 @@ export function parseImport(text) {
   d.accounts.forEach((x, i) => {
     if (!x.id || !x.name) problems.push(`第 ${i + 1} 個帳戶缺少 id 或名稱`);
     if (!TYPES.includes(x.type)) problems.push(`帳戶「${x.name}」類型不正確（${x.type}）`);
-    if (!['TWD', 'USD'].includes(x.cur)) problems.push(`帳戶「${x.name}」幣別不正確（${x.cur}）`);
+    if (!['TWD', 'USD', 'JPY'].includes(x.cur)) problems.push(`帳戶「${x.name}」幣別不正確（${x.cur}）`);
   });
   const hids = new Set(d.holdings.map(h => h.id));
   d.holdings.forEach(h => { if (!ids.has(h.acct) && !store.S.accounts.some(a => a.id === h.acct)) problems.push(`標的「${h.name}」的帳戶不存在`); });

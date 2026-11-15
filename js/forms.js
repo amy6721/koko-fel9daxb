@@ -81,7 +81,7 @@ function render() {
 }
 
 function amountBox(cur, editable = true, value = F.amt) {
-  return `<div class="amount-box"><label><span class="cur">${cur === 'USD' ? 'US$' : '$'}</span>
+  return `<div class="amount-box"><label><span class="cur">${cur === 'USD' ? 'US$' : cur === 'JPY' ? '¥' : '$'}</span>
     <input id="f-amt" data-bind="amt" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(value)}" aria-label="金額" style="width:${amtWidth(value)}" ${editable ? '' : 'readonly tabindex="-1"'}></label></div>`;
 }
 const amtWidth = v => `${Math.max(1, String(v || '').length) + 0.4}ch`;
@@ -108,7 +108,7 @@ function cashBody(S, a) {
   if (F.kind === 'transfer') {
     const b = acctById(S, F.to);
     h += fieldBtn('pick-to', 'transfer', '轉入帳戶', acctLabel(b), !b);
-    if (a && b && a.cur !== b.cur) h += `<label class="field-row"><span class="bubble sm prim">${icon('currency', 18)}</span><span class="main"><span class="k">實際轉入金額（${b.cur}）・換匯後入帳的金額</span><input id="f-amt2" data-bind="amt2" inputmode="decimal" value="${esc(F.amt2)}" placeholder="例如 ${b.cur === 'USD' ? '100.00' : '3,050'}" autocomplete="off"></span></label>`;
+    if (a && b && a.cur !== b.cur) h += `<label class="field-row"><span class="bubble sm prim">${icon('currency', 18)}</span><span class="main"><span class="k">實際轉入金額（${b.cur}）・換匯後入帳的金額</span><input id="f-amt2" data-bind="amt2" inputmode="decimal" value="${esc(F.amt2)}" placeholder="例如 ${b.cur === 'USD' ? '100.00' : b.cur === 'JPY' ? '10,000' : '3,050'}" autocomplete="off"></span></label>`;
   }
   h += dateRow() + noteRow() + '</div>';
   return h;

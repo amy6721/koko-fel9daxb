@@ -13,7 +13,8 @@ export const ACCOUNT_TYPES = {
   debt: { label: '負債', icon: 'credit-card' },
 };
 export const TYPE_ORDER = ['bank', 'cash', 'fx', 'broker', 'fund', 'insure', 'deposit', 'debt'];
-export const CURRENCIES = ['TWD', 'USD'];
+export const CURRENCIES = ['TWD', 'USD', 'JPY'];
+export const CUR_LABEL = { TWD: '台幣', USD: '美元', JPY: '日圓' };
 
 export const CATEGORIES = {
   expense: [
@@ -45,7 +46,7 @@ export const acctById = (S, id) => S.accounts.find(a => a.id === id);
 export const holdById = (S, id) => S.holdings.find(h => h.id === id);
 export const isCard = a => a && a.type === 'debt' && Number(a.billDay) > 0;
 export const unitWord = h => (h && h.kind === '基金' ? '單位' : '股');
-export function fxRate(S, cur) { return cur === 'USD' ? Number(S.settings.fxUSD) || 0 : 1; }
+export function fxRate(S, cur) { return cur === 'USD' ? Number(S.settings.fxUSD) || 0 : cur === 'JPY' ? Number(S.settings.fxJPY) || 0 : 1; }
 /** 日期早於「開始使用日」的紀錄 = 補登 */
 export const isBackfill = (S, t) => !!S.settings.startDate && t.date < S.settings.startDate;
 /** 依日期、建立時間排序（舊 → 新） */
@@ -268,7 +269,7 @@ export function cardInfo(S, a, today = todayStr()) {
 export function makeSnapshot(S, month) {
   const prices = {};
   for (const h of S.holdings) prices[h.id] = currentPrice(S, h);
-  return { month, date: month + '-01', fxUSD: Number(S.settings.fxUSD) || 0, prices };
+  return { month, date: month + '-01', fxUSD: Number(S.settings.fxUSD) || 0, fxJPY: Number(S.settings.fxJPY) || 0, prices };
 }
 /** 本月還沒有快照（且已到開始使用月）就要建立 */
 export function needSnapshot(S, today = todayStr()) {
@@ -286,9 +287,9 @@ function priceAt(S, snaps, idx, h) {
   return currentPrice(S, h);
 }
 function fxAt(S, snaps, idx, cur) {
-  if (cur !== 'USD') return 1;
-  const f = Number(snaps[idx] && snaps[idx].fxUSD);
-  return f > 0 ? f : fxRate(S, 'USD');
+  if (cur === 'TWD') return 1;
+  const f = Number(snaps[idx] && snaps[idx]['fx' + cur]);
+  return f > 0 ? f : fxRate(S, cur);
 }
 /** 指定快照時點（該月 1 日 00:00）的資產、負債、淨資產 */
 function valuesAtSnapshot(S, snaps, idx) {
@@ -346,7 +347,7 @@ export function investMonths(S, filter = 'all', today = todayStr()) {
       const p = i >= 0 ? priceAt(S, snaps, i, h) : currentPrice(S, h);
       const fx = i >= 0 ? fxAt(S, snaps, i, h.cur) : fxRate(S, h.cur);
       v += u * p * fx;
-      if (h.cur === 'USD') usd[h.id] = { u, p, fx };
+      if (h.cur !== 'TWD') usd[h.id] = { u, p, fx };
     }
     return { v, usd };
   }
@@ -356,7 +357,7 @@ export function investMonths(S, filter = 'all', today = todayStr()) {
     for (const h of hs) {
       const u = R.pos[h.id]?.units || 0, p = currentPrice(S, h), fx = fxRate(S, h.cur);
       v += u * p * fx;
-      if (h.cur === 'USD') usd[h.id] = { u, p, fx };
+      if (h.cur !== 'TWD') usd[h.id] = { u, p, fx };
     }
     return { v, usd };
   }
@@ -369,7 +370,7 @@ export function investMonths(S, filter = 'all', today = todayStr()) {
     for (const t of S.txs) {
       if (!t.date.startsWith(m) || !ids.has(t.hid) || !INVEST_KINDS.includes(t.kind) || isBackfill(S, t)) continue;
       const h = holdById(S, t.hid);
-      const r = h && h.cur === 'USD' ? (end.usd[h.id]?.fx || fxRate(S, 'USD')) : 1;
+      const r = h && h.cur !== 'TWD' ? (end.usd[h.id]?.fx || fxRate(S, h.cur)) : 1;
       const v = (Number(t.amt) || 0) * r;
       const w = 1 - (Number(t.date.slice(8)) - 1) / dim;
       if (t.kind === 'buy') { inn += v; wi += v * w; }

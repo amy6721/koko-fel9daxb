@@ -66,11 +66,12 @@ async function fromFinMind(code) {
   return { price: Number(last.close), date: last.date };
 }
 
-export async function fetchUsdTwd() {
+/** 回傳 { USD: 1 美元幾台幣, JPY: 1 日圓幾台幣 } */
+export async function fetchFx() {
   const j = await getJSON('https://open.er-api.com/v6/latest/USD');
-  const r = Number(j && j.rates && j.rates.TWD);
-  if (!(r > 0)) throw new Error('匯率資料格式不符');
-  return r;
+  const twd = Number(j && j.rates && j.rates.TWD), jpy = Number(j && j.rates && j.rates.JPY);
+  if (!(twd > 0) || !(jpy > 0)) throw new Error('匯率資料格式不符');
+  return { USD: twd, JPY: twd / jpy };
 }
 
 /**
@@ -82,7 +83,7 @@ export async function fetchPrices(holdings) {
   const prices = {}, errors = {};
   const [cn, fx] = await Promise.all([
     fromCnyes(stocks),
-    fetchUsdTwd().catch(() => null),
+    fetchFx().catch(() => null),
   ]);
   await Promise.all(stocks.map(async h => {
     const hit = cn[cnyesSymbol(h)];

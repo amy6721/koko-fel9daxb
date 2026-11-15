@@ -29,7 +29,9 @@ export function render(S) {
     <label class="field"><span class="lbl">開始使用日</span><input class="inp" type="date" data-act-change="start-date" value="${esc(S.settings.startDate)}" max="${todayStr()}"></label>
     <p class="note" style="margin-top:-8px">帳戶的期初餘額是這一天的餘額。日期早於這天的投資紀錄視為「補登」，只算進成本，不影響帳戶餘額。</p>
     <label class="field"><span class="lbl">預設帳戶（記帳時預先選好）</span><select class="inp" data-act-change="default-acct"><option value="">自動（優先選現金、存款）</option>${S.accounts.filter(a => !a.archived).map(a => `<option value="${esc(a.id)}" ${S.settings.defaultAcct === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label>
-    <label class="field"><span class="lbl">美元匯率（USD → TWD）・有網路時會自動更新</span><input class="inp num" inputmode="decimal" data-act-change="fx" value="${esc(S.settings.fxUSD)}"></label>
+    <div class="two"><label class="field"><span class="lbl">美元匯率（1 USD＝幾台幣）</span><input class="inp num" inputmode="decimal" data-act-change="fx" data-cur="USD" value="${esc(S.settings.fxUSD)}"></label>
+      <label class="field"><span class="lbl">日圓匯率（1 JPY＝幾台幣）</span><input class="inp num" inputmode="decimal" data-act-change="fx" data-cur="JPY" value="${esc(S.settings.fxJPY)}"></label></div>
+    <p class="note" style="margin-top:-8px">有網路時會自動更新匯率。</p>
   </section>`;
 
   h += `<section class="card"><div class="sec-head"><h2>帳戶</h2><button class="btn sm soft" data-act="new-acct">${icon('add', 16)}新增帳戶</button></div>`;
@@ -61,7 +63,7 @@ export function render(S) {
     <p class="note"><b>iPhone</b>：用 Safari 打開網址 → 分享 → 加入主畫面。</p>
     <p class="note"><b>Android</b>：用 Chrome 打開網址 → 右上選單 → 加到主畫面（或「安裝應用程式」）。</p>
     <p class="note">從主畫面打開時會全螢幕顯示，沒有網址列。</p></section>
-  <p class="note" style="text-align:center">摳摳 v1.2</p>`;
+  <p class="note" style="text-align:center">摳摳 v1.3</p>`;
   return h;
 }
 
@@ -95,8 +97,9 @@ export const actions = {
   },
   fx: async el => {
     const v = num(el.value);
-    if (!(v > 0)) { el.value = store.S.settings.fxUSD; return toast('匯率請填大於 0 的數字', true); }
-    try { await commit(d => { d.settings.fxUSD = v; }, ['settings']); toast('已更新匯率'); rerender(); }
+    const k = 'fx' + (el.dataset.cur || 'USD');
+    if (!(v > 0)) { el.value = store.S.settings[k]; return toast('匯率請填大於 0 的數字', true); }
+    try { await commit(d => { d.settings[k] = v; }, ['settings']); toast('已更新匯率'); rerender(); }
     catch (e) { toast('儲存失敗：' + e.message, true); }
   },
   'edit-acct': el => openAccountForm(el.dataset.id),
@@ -230,6 +233,6 @@ function openPasteImport() {
 }
 function pickSettings(o) {
   const out = {};
-  for (const k of ['startDate', 'defaultAcct', 'fxUSD', 'appName', 'iconStyle']) if (o[k] !== undefined && o[k] !== '') out[k] = o[k];
+  for (const k of ['startDate', 'defaultAcct', 'fxUSD', 'fxJPY', 'appName', 'iconStyle']) if (o[k] !== undefined && o[k] !== '') out[k] = o[k];
   return out;
 }
